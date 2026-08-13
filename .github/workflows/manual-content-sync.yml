@@ -1,0 +1,70 @@
+name: 手動同步講稿至 Supabase
+
+on:
+  workflow_dispatch:
+    inputs:
+      article_path:
+        description: "要同步的 Markdown 路徑"
+        required: true
+        default: "第01次_南山經_彙整與討論.md"
+        type: choice
+        options:
+          - "第01次_南山經_彙整與討論.md"
+          - "第02次_西山經_整合詳版.md"
+          - "第03次_北山經_整合詳版.md"
+          - "第04次_東山經_彙整與討論.md"
+          - "第05次_中山經（上）_整合詳版.md"
+          - "第06次_中山經（下）_深度彙整.md"
+          - "第07次_海外經（上）_彙整與討論.md"
+          - "第08次_海外經（下）_彙整與討論.md"
+          - "第09次_海內經（上）_彙整與討論.md"
+          - "第10次_海內經（下）_彙整與討論.md"
+          - "第11次_大荒經（上）_彙整與討論.md"
+          - "第12次_大荒經（下）_彙整與討論.md"
+          - "第13次_海內經（末卷）_全書總結.md"
+      dry_run:
+        description: "僅檢查與預覽，不寫入 Supabase"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  sync-to-review:
+    name: 同步至 Supabase review
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - name: 取得文案庫版本
+        uses: actions/checkout@v4
+
+      - name: 使用 Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 同步文章至 review
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            node .github/scripts/sync-markdown-to-supabase.mjs --path "${{ inputs.article_path }}" --dry-run
+          else
+            node .github/scripts/sync-markdown-to-supabase.mjs --path "${{ inputs.article_path }}"
+          fi
+
+      - name: 寫入執行摘要
+        if: always()
+        run: |
+          {
+            echo "## 內容同步結果"
+            echo ""
+            echo "- **來源文章：** \`${{ inputs.article_path }}\`"
+            echo "- **模式：** ${{ inputs.dry_run && '預覽（不寫入）' || '同步至 Supabase review' }}"
+            echo "- **官網公開：** 否"
+            echo "- **LINE OA 推播：** 否"
+            echo ""
+            echo "同步完成後，請在管理端審核文章，再決定是否公開或建立 LINE 推播草稿。"
+          } >> "$GITHUB_STEP_SUMMARY"
